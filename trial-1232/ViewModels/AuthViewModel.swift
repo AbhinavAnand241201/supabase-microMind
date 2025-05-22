@@ -49,4 +49,38 @@ class AuthViewModel: ObservableObject {
             self.isAuthenticated = false
         }
     }
+    
+    func updateEmail(newEmail: String) async {
+        guard let userId = user?.id else {
+            errorMessage = "No user logged in"
+            return
+        }
+        
+        // Validate email format
+        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPredicate = NSPredicate(format:"SELF MATCHES %@", emailRegex)
+        guard emailPredicate.evaluate(with: newEmail) else {
+            errorMessage = "Invalid email format"
+            return
+        }
+        
+        do {
+            let updatedUser = try await supabase.updateUserEmail(userId: userId, newEmail: newEmail)
+            self.user = updatedUser
+            self.errorMessage = nil
+        } catch {
+            self.errorMessage = error.localizedDescription
+        }
+    }
+    
+    func signOut() async {
+        do {
+            try await supabase.signOut()
+            self.isAuthenticated = false
+            self.user = nil
+            self.errorMessage = nil
+        } catch {
+            self.errorMessage = error.localizedDescription
+        }
+    }
 } 

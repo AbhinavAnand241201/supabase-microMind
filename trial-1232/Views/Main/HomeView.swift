@@ -100,8 +100,9 @@ struct HomeView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack {
-                        Button("Profile") {
-                            // Placeholder for Part 3
+                        NavigationLink(destination: ProfileView()) {
+                            Image(systemName: "person.circle")
+                                .imageScale(.large)
                         }
                         Button("Past Chats") {
                             // Placeholder for Part 4
