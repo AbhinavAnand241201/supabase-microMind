@@ -12,18 +12,15 @@ struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @StateObject private var authViewModel = AuthViewModel()
 
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
-
     var body: some View {
-        if authViewModel.isAuthenticated {
-            HomeView()
-                .environmentObject(authViewModel)
-        } else {
-            AuthView()
-                .environmentObject(authViewModel)
+        Group {
+            if authViewModel.isAuthenticated {
+                HomeView()
+                    .environmentObject(authViewModel)
+            } else {
+                AuthView()
+                    .environmentObject(authViewModel)
+            }
         }
         .onAppear {
             Task {

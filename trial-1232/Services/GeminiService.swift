@@ -1,5 +1,10 @@
 import Foundation
 
+enum GeminiError: Error {
+    case invalidResponse
+    case cannotParseResponse
+}
+
 class GeminiService {
     static let shared = GeminiService()
     
@@ -15,9 +20,9 @@ class GeminiService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let prompt = """
-        Analyze the following journal entry and provide a brief insight (1-2 sentences) about the user's mood or sentiment. Keep it simple and supportive.
-        Journal: \(content)
-        """
+You are a supportive counselor. Analyze the following journal entry (up to 200 words) and provide a 2-3 sentence insight about the user's emotional state or mood. Offer a gentle, empathetic suggestion for self-care or reflection, tailored to the entry's tone. Keep the response concise and uplifting.
+Journal: \(content)
+"""
         
         let body: [String: Any] = [
             "contents": [
@@ -45,7 +50,7 @@ class GeminiService {
            let text = parts.first?["text"] as? String {
             return text
         } else {
-            throw URLError(.cannotParseResponse)
+            throw GeminiError.cannotParseResponse
         }
     }
 } 

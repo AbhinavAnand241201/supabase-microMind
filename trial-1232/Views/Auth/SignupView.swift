@@ -5,12 +5,18 @@ struct SignupView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
+    @State private var name = ""
     
     var body: some View {
         VStack(spacing: 20) {
             Text("Sign Up")
                 .font(.title)
                 .fontWeight(.bold)
+            
+            TextField("Name", text: $name)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .padding(.horizontal)
+                .autocapitalization(.words)
             
             TextField("Email", text: $email)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -35,7 +41,7 @@ struct SignupView: View {
             Button(action: {
                 if password == confirmPassword {
                     Task {
-                        await authViewModel.signUp(email: email, password: password)
+                        await authViewModel.signUp(email: email, password: password, name: name)
                     }
                 } else {
                     authViewModel.errorMessage = "Passwords do not match"

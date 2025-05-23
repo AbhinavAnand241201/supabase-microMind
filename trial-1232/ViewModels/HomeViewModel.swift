@@ -1,43 +1,21 @@
 import Foundation
+import SwiftUI // Import SwiftUI for @AppStorage
 
 @MainActor
 class HomeViewModel: ObservableObject {
     @Published var journalText = ""
     @Published var wordCount = 0
-    @Published var aiInsight: String?
+    @Published var aiInsight: String? // Keep aiInsight for immediate display
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @Published var journalEntries: [JournalEntry] = []
+    @Published var showRetry = false
+    @Published var journalEntries: [JournalEntry] = [] // Add journalEntries here for displaying past entries in HomeView
     
-    private let supabase = SupabaseService.shared
+    @AppStorage("authToken") private var authToken: String?
+    
+    private let backend = BackendService.shared
     private let gemini = GeminiService.shared
     private let maxWords = 200
-    private var subscriptionTask: Task<Void, Never>?
-    
-    init() {
-        setupSubscription()
-    }
-    
-    deinit {
-        subscriptionTask?.cancel()
-    }
-    
-    private func setupSubscription() {
-        subscriptionTask = Task {
-            do {
-                if let userId = try await supabase.getCurrentSession()?.user.id {
-                    let stream = try await supabase.subscribeToJournalEntries(userId: userId)
-                    for await entry in stream {
-                        if !journalEntries.contains(where: { $0.id == entry.id }) {
-                            journalEntries.insert(entry, at: 0)
-                        }
-                    }
-                }
-            } catch {
-                print("Error setting up subscription: \(error)")
-            }
-        }
-    }
     
     func updateWordCount() {
         let words = journalText.split { $0.isWhitespace || $0.isNewline }
@@ -53,33 +31,70 @@ class HomeViewModel: ObservableObject {
             return
         }
         
+        guard let token = authToken else {
+             errorMessage = "Authentication token missing."
+             return
+        }
+        
         isLoading = true
         errorMessage = nil
+        showRetry = false
+        aiInsight = nil // Clear previous insight
         
         do {
-            // Save to Supabase
-            let entry = try await supabase.saveJournalEntry(content: journalText, userId: userId)
-            journalEntries.insert(entry, at: 0)
-            
-            // Analyze with Gemini AI
+            // Analyze with Gemini AI first
             let insight = try await gemini.analyzeJournal(content: journalText)
-            aiInsight = insight
+            aiInsight = insight // Display immediately after analysis
+            
+            // Save to backend with the insight
+            let entry = try await backend.saveJournalEntry(content: journalText, userId: userId, aiInsight: insight, token: token)
+            // Optionally add the new entry to the journalEntries array if you want to display it immediately in the list
+             journalEntries.insert(entry, at: 0)
             
             // Clear text after submission
             journalText = ""
             wordCount = 0
+        } catch BackendError.serverError(let message) {
+            errorMessage = "Server error: \(message)"
+            showRetry = true
+        } catch BackendError.requestFailed(let error) {
+             errorMessage = "Request failed: \(error.localizedDescription)"
+             showRetry = true
+        } catch GeminiError.cannotParseResponse {
+            errorMessage = "Failed to get AI insight: Cannot parse response."
+            showRetry = true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "Failed to save entry: \(error.localizedDescription)"
+            showRetry = true
         }
         
         isLoading = false
     }
     
     func loadJournalEntries(userId: String) async {
+        guard let token = authToken else {
+             errorMessage = "Authentication token missing."
+             return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        showRetry = false
+        
         do {
-            journalEntries = try await supabase.getJournalEntries(userId: userId)
+            let entries = try await backend.fetchJournalEntries(userId: userId, token: token)
+            journalEntries = entries
+        } catch BackendError.serverError(let message) {
+            errorMessage = "Server error: \(message)"
+            showRetry = true
+        }  catch BackendError.requestFailed(let error) {
+             errorMessage = "Request failed: \(error.localizedDescription)"
+             showRetry = true
         } catch {
             errorMessage = "Failed to load journal entries: \(error.localizedDescription)"
+            showRetry = true
         }
+        
+        isLoading = false
     }
 } 

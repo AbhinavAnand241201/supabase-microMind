@@ -1,13 +1,15 @@
 import Foundation
 
-struct Profile: Identifiable, Codable {
+struct Profile: Codable {
     let id: String
-    var email: String
-    var updatedAt: Date
+    let email: String
+    let name: String
+    let createdAt: Date
     
     enum CodingKeys: String, CodingKey {
-        case id
+        case id = "_id"
         case email
-        case updatedAt = "updated_at"
+        case name
+        case createdAt
     }
 } 

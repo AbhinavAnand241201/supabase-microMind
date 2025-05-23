@@ -1,86 +1,128 @@
 import Foundation
-import Supabase
+import SwiftUI
 
 @MainActor
 class AuthViewModel: ObservableObject {
     @Published var isAuthenticated = false
     @Published var errorMessage: String?
     @Published var user: User?
+    @Published var showSignOutConfirmation = false
     
-    private let supabase = SupabaseService.shared
+    @AppStorage("authToken") private var authToken: String?
     
-    func signUp(email: String, password: String) async {
+    private let backend = BackendService.shared
+    
+    func signUp(email: String, password: String, name: String) async {
+        isLoading = true
+        errorMessage = nil
+        showSignOutConfirmation = false
+        
         do {
-            let response = try await supabase.signUp(email: email, password: password)
-            if let user = response.user {
-                self.user = User(id: user.id, email: user.email ?? "")
-                self.isAuthenticated = true
-                self.errorMessage = nil
-            }
+            let response = try await backend.signUp(email: email, password: password, name: name)
+            self.user = response.user
+            self.authToken = response.token
+            self.isAuthenticated = true
+            self.errorMessage = nil
+        } catch BackendError.serverError(let message) {
+            self.errorMessage = message
+        } catch BackendError.requestFailed(let error) {
+             self.errorMessage = "Request failed: \(error.localizedDescription)"
         } catch {
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
         }
+         isLoading = false
     }
     
     func signIn(email: String, password: String) async {
+        isLoading = true
+        errorMessage = nil
+        showSignOutConfirmation = false
+
         do {
-            let response = try await supabase.signIn(email: email, password: password)
-            if let user = response.user {
-                self.user = User(id: user.id, email: user.email ?? "")
-                self.isAuthenticated = true
-                self.errorMessage = nil
-            }
+            let response = try await backend.signIn(email: email, password: password)
+            self.user = response.user
+            self.authToken = response.token
+            self.isAuthenticated = true
+            self.errorMessage = nil
+        } catch BackendError.serverError(let message) {
+            self.errorMessage = message
+        } catch BackendError.requestFailed(let error) {
+             self.errorMessage = "Request failed: \(error.localizedDescription)"
         } catch {
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
         }
+        isLoading = false
     }
     
     func checkSession() async {
-        do {
-            if let session = try await supabase.getCurrentSession() {
-                self.user = User(id: session.user.id, email: session.user.email ?? "")
-                self.isAuthenticated = true
-            } else {
-                self.isAuthenticated = false
-                self.user = nil
-            }
-        } catch {
-            self.errorMessage = error.localizedDescription
+        guard let token = authToken else {
             self.isAuthenticated = false
+            self.user = nil
+            return
+        }
+        
+        do {
+            let response = try await backend.getCurrentUser(token: token)
+            self.user = response.user
+            self.isAuthenticated = true
+            self.errorMessage = nil
+        } catch {
+            self.isAuthenticated = false
+            self.user = nil
+            self.authToken = nil
+            self.errorMessage = "Session expired. Please log in again."
         }
     }
     
     func updateEmail(newEmail: String) async {
-        guard let userId = user?.id else {
-            errorMessage = "No user logged in"
+        guard let userId = user?.id, let token = authToken else {
+            errorMessage = "User not logged in or token missing."
             return
         }
-        
-        // Validate email format
-        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
-        let emailPredicate = NSPredicate(format:"SELF MATCHES %@", emailRegex)
-        guard emailPredicate.evaluate(with: newEmail) else {
-            errorMessage = "Invalid email format"
-            return
-        }
+        isLoading = true
+        errorMessage = nil
+        showSignOutConfirmation = false
         
         do {
-            let updatedUser = try await supabase.updateUserEmail(userId: userId, newEmail: newEmail)
-            self.user = updatedUser
-            self.errorMessage = nil
+             let response = try await backend.updateUserEmail(userId: userId, newEmail: newEmail, token: token)
+            self.user = response.user
+            self.errorMessage = "Email updated successfully"
+        } catch BackendError.serverError(let message) {
+            self.errorMessage = message
+        } catch BackendError.requestFailed(let error) {
+             self.errorMessage = "Request failed: \(error.localizedDescription)"
         } catch {
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = "Error updating email: \(error.localizedDescription)"
         }
+         isLoading = false
     }
     
     func signOut() async {
-        do {
-            try await supabase.signOut()
+        guard let token = authToken else {
             self.isAuthenticated = false
             self.user = nil
+            self.authToken = nil
+            self.errorMessage = nil
+            showSignOutConfirmation = false
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        showSignOutConfirmation = false
+        
+        do {
+             _ = try await backend.signOut(token: token)
+            
+            self.isAuthenticated = false
+            self.user = nil
+            self.authToken = nil
             self.errorMessage = nil
         } catch {
-            self.errorMessage = error.localizedDescription
+            self.errorMessage = "Error signing out: \(error.localizedDescription)"
         }
+         isLoading = false
     }
+    
+    @Published var isLoading = false
 } 

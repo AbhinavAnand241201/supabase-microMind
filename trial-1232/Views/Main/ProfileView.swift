@@ -42,8 +42,9 @@ struct ProfileView: View {
                                     .font(.caption)
                                     .foregroundColor(.gray)
                                 if isEditing {
-                                    TextField("Email", text: $newEmail)
+                                    TextField("New Email", text: $newEmail)
                                         .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .padding(.horizontal)
                                         .autocapitalization(.none)
                                         .keyboardType(.emailAddress)
                                 } else {
@@ -58,6 +59,7 @@ struct ProfileView: View {
                                     if isEditing {
                                         Task {
                                             await authViewModel.updateEmail(newEmail: newEmail)
+                                            newEmail = ""
                                             isEditing = false
                                         }
                                     } else {
@@ -74,9 +76,7 @@ struct ProfileView: View {
                                 }
                                 
                                 Button(action: {
-                                    Task {
-                                        await authViewModel.signOut()
-                                    }
+                                    authViewModel.showSignOutConfirmation = true
                                 }) {
                                     Text("Sign Out")
                                         .frame(maxWidth: .infinity)
@@ -112,6 +112,16 @@ struct ProfileView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(alertMessage)
+            }
+            .alert("Sign Out", isPresented: $authViewModel.showSignOutConfirmation) {
+                Button("Sign Out", role: .destructive) {
+                    Task {
+                        await authViewModel.signOut()
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Are you sure you want to sign out?")
             }
         }
     }

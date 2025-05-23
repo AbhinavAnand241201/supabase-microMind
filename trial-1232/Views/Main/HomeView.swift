@@ -30,94 +30,76 @@ struct HomeView: View {
     @StateObject private var homeViewModel = HomeViewModel()
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Journal Entry Section
-                    VStack(spacing: 16) {
-                        Text("Journal Your Thoughts")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        TextEditor(text: $homeViewModel.journalText)
-                            .frame(height: 200)
-                            .padding()
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray))
-                            .onChange(of: homeViewModel.journalText) { _ in
-                                homeViewModel.updateWordCount()
-                            }
-                        
-                        Text("Word Count: \(homeViewModel.wordCount)/200")
-                            .font(.caption)
-                        
-                        if homeViewModel.isLoading {
-                            ProgressView()
-                        }
-                        
-                        if let error = homeViewModel.errorMessage {
-                            Text(error)
-                                .foregroundColor(.red)
-                                .font(.caption)
-                        }
-                        
-                        Button(action: {
-                            Task {
-                                if let userId = authViewModel.user?.id {
-                                    await homeViewModel.submitJournal(userId: userId)
-                                }
-                            }
-                        }) {
-                            Text("Submit")
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                    }
-                    .padding()
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 15))
-                    .shadow(radius: 2)
-                    
-                    // Past Entries Section
-                    if !homeViewModel.journalEntries.isEmpty {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Past Entries")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            
-                            ForEach(homeViewModel.journalEntries) { entry in
-                                JournalEntryView(entry: entry, insight: homeViewModel.aiInsight)
-                            }
-                        }
-                        .padding()
-                    }
-                }
+        VStack(spacing: 20) {
+            Text("Journal Your Thoughts")
+                .font(.title)
+                .fontWeight(.bold)
+            
+            TextEditor(text: $homeViewModel.journalText)
+                .frame(height: 200)
                 .padding()
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray))
+                .onChange(of: homeViewModel.journalText) { _ in
+                    homeViewModel.updateWordCount()
+                }
+            
+            Text("Word Count: \(homeViewModel.wordCount)/200")
+                .font(.caption)
+            
+            if homeViewModel.isLoading {
+                ProgressView()
             }
-            .navigationTitle("Home")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack {
-                        NavigationLink(destination: ProfileView()) {
-                            Image(systemName: "person.circle")
-                                .imageScale(.large)
+            
+            if let insight = homeViewModel.aiInsight {
+                Text("Insight: \(insight)")
+                    .font(.subheadline)
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.gray.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            
+            if let error = homeViewModel.errorMessage {
+                Text(error)
+                    .foregroundColor(.red)
+                    .font(.caption)
+                
+                if homeViewModel.showRetry {
+                    Button(action: {
+                        Task {
+                            if let userId = authViewModel.user?.id {
+                                await homeViewModel.submitJournal(userId: userId)
+                            }
                         }
-                        Button("Past Chats") {
-                            // Placeholder for Part 4
-                        }
+                    }) {
+                        Text("Retry")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
+                    .padding(.horizontal)
                 }
             }
-            .onAppear {
-                if let userId = authViewModel.user?.id {
-                    Task {
-                        await homeViewModel.loadJournalEntries(userId: userId)
+            
+            Button(action: {
+                Task {
+                    if let userId = authViewModel.user?.id {
+                        await homeViewModel.submitJournal(userId: userId)
                     }
                 }
+            }) {
+                Text("Submit")
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
             }
+            .padding(.horizontal)
         }
+        .padding()
     }
 }
 
